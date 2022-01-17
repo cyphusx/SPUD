@@ -193,20 +193,17 @@ void USpudSubsystem::OnPreLoadMap(const FString& MapName)
 	if (CurrentState == ESpudSystemState::RunningIdle)
 	{
 		UnsubscribeAllLevelObjectEvents();
-
-		const auto World = GetWorld();
-		if (IsValid(World))
-		{
-			UE_LOG(LogSpudSubsystem, Verbose, TEXT("OnPreLoadMap saving: %s"), *UGameplayStatics::GetCurrentLevelName(World));
-#ifdef USE_SAVEGAMESYSTEM
-			// Keep it in memory
-			StoreWorld(World, false, true);
-#else
-			// Map and all streaming level data will be released.
-			// Block while doing it so they all get written predictably
-			StoreWorld(World, true, true);
-#endif
-		}
+	
+		// @third party code - BEGIN Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
+		// const auto World = GetWorld();
+		// if (IsValid(World))
+		// {
+		// 	UE_LOG(LogSpudSubsystem, Verbose, TEXT("OnPreLoadMap saving: %s"), *UGameplayStatics::GetCurrentLevelName(World));
+		// 	// Map and all streaming level data will be released.
+		// 	// Block while doing it so they all get written predictably
+		// 	StoreWorld(World, true, true);
+		// }
+		// @third party code - END Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
 	}
 }
 
@@ -242,7 +239,9 @@ void USpudSubsystem::OnPostLoadMap(UWorld* World)
 			CurrentState = ESpudSystemState::RunningIdle;
 		}
 		break;
-	case ESpudSystemState::RunningIdle:
+	// @third party code - BEGIN Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
+	//case ESpudSystemState::RunningIdle:
+	// @third party code - END Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
 	case ESpudSystemState::LoadingGame:
 		// This is called when a new map is loaded
 		// In all cases, we try to load the state

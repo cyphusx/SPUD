@@ -58,8 +58,14 @@ void USpudState::StoreLevel(ULevel* Level, bool bReleaseAfter, bool bBlocking)
 		{
 			if (SpudPropertyUtil::IsPersistentObject(Actor))
 			{
-				StoreActor(Actor, LevelData);
-			}
+				// @third party code - BEGIN Support not saving some ISpudObjects based on their internal state
+				//StoreActor(Actor, LevelData);
+				if (!ISpudObject::Execute_ShouldSkipStore(Actor))
+				{
+					StoreActor(Actor, LevelData);
+				}
+				// @third party code - END Support not saving some ISpudObjects based on their internal state
+			}					
 		}
 
 		// ReSharper disable once CppExpressionWithoutSideEffects

@@ -16,6 +16,17 @@ bool SpudPropertyUtil::ShouldPropertyBeIncluded(FProperty* Property, bool IsChil
 {
 	if (Property->HasAnyPropertyFlags(CPF_Deprecated))
 		return false;
+	// @third party code - BEGIN Check for persistent components
+	// Assume all actor components with the right interface wish to be persisted
+	if (const FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property))
+	{
+		if (ObjectProperty->PropertyClass->IsChildOf(UActorComponent::StaticClass())
+			&& ObjectProperty->PropertyClass->ImplementsInterface(USpudComponent::StaticClass()))
+		{
+			return true;
+		}
+	}
+	// @third party code - END Check for persistent components
 	if (!Property->HasAnyPropertyFlags(CPF_SaveGame) && !IsChildOfSaveGame)
 		return false;
 

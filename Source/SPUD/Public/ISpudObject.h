@@ -53,6 +53,13 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "SPUD Interface")
 	bool ShouldSkipRestoreVelocity() const; virtual bool ShouldSkipRestoreVelocity_Implementation() const { return false; }
 
+	// @third party code - BEGIN Support not saving some ISpudObjects based on their internal state
+	/// Return whether this object should be skipped from being saved.  Allows objects that are in a temporary state
+	/// to opt-out of storage until they're made more permanent.
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "SPUD Interface")
+	bool ShouldSkipStore() const; virtual bool ShouldSkipStore_Implementation() const { return false; }
+	// @third party code - END Support not saving some ISpudObjects based on their internal state
+
 	// Allows the object to override its name, as used for identifying itself in saved games.
 	// The default is to use the object's native name. That is fine for level actors, but in built games (not the editor) actors that are
 	// automatically spawned, such as the player's pawn, controller, and game state, get different names each time they are created.
@@ -142,3 +149,21 @@ public:
     void SpudPostRestore(const USpudState* State);
 
 };
+
+// @third party code - BEGIN Check for persistent components
+UINTERFACE(MinimalAPI)
+class USpudComponent : public UInterface
+{
+	GENERATED_BODY()
+};
+
+/**
+* Opts a class implementing this component into persistence. If an actor component attached to an actor implements this
+* interface then it will be included in persistent game state. Any properties marked as SaveGame will be persisted.
+*/
+class SPUD_API ISpudComponent
+{
+	GENERATED_BODY()
+};
+// @third party code - END Check for persistent components
+
