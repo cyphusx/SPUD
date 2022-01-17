@@ -146,15 +146,17 @@ void USpudSubsystem::OnPreLoadMap(const FString& MapName)
 	if (CurrentState == ESpudSystemState::RunningIdle)
 	{
 		UnsubscribeAllLevelObjectEvents();
-
-		const auto World = GetWorld();
-		if (IsValid(World))
-		{
-			UE_LOG(LogSpudSubsystem, Verbose, TEXT("OnPreLoadMap saving: %s"), *UGameplayStatics::GetCurrentLevelName(World));
-			// Map and all streaming level data will be released.
-			// Block while doing it so they all get written predictably
-			StoreWorld(World, true, true);
-		}
+	
+		// @third party code - BEGIN Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
+		// const auto World = GetWorld();
+		// if (IsValid(World))
+		// {
+		// 	UE_LOG(LogSpudSubsystem, Verbose, TEXT("OnPreLoadMap saving: %s"), *UGameplayStatics::GetCurrentLevelName(World));
+		// 	// Map and all streaming level data will be released.
+		// 	// Block while doing it so they all get written predictably
+		// 	StoreWorld(World, true, true);
+		// }
+		// @third party code - END Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
 	}
 }
 
@@ -173,8 +175,11 @@ void USpudSubsystem::OnPostLoadMap(UWorld* World)
 {
 	if (!ServerCheck(false))
 		return;
-	
-	if (CurrentState == ESpudSystemState::RunningIdle ||
+
+	// @third party code - BEGIN Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
+	//if (CurrentState == ESpudSystemState::RunningIdle ||
+	if (
+	// @third party code - END Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
 		CurrentState == ESpudSystemState::LoadingGame)
 	{
 		// This is called when a new map is loaded
@@ -478,7 +483,10 @@ void USpudSubsystem::LoadGame(const FString& SlotName)
 	// This is deferred, final load process will happen in PostLoadMap
 	SlotNameInProgress = SlotName;
 	UE_LOG(LogSpudSubsystem, Verbose, TEXT("(Re)loading map: %s"), *State->GetPersistentLevel());		
-	UGameplayStatics::OpenLevel(GetWorld(), FName(State->GetPersistentLevel()));
+	// @third party code - BEGIN Stop clients being disconnected on load
+	//UGameplayStatics::OpenLevel(GetWorld(), FName(State->GetPersistentLevel()));
+	GetWorld()->ServerTravel(State->GetPersistentLevel(), true);
+	// @third party code - END Stop clients being disconnected on load
 }
 
 
