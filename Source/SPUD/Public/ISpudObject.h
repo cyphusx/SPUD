@@ -59,6 +59,13 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "SPUD Interface")
 	bool ShouldSkipStore() const; virtual bool ShouldSkipStore_Implementation() const { return false; }
 	// @third party code - END Support not saving some ISpudObjects based on their internal state
+
+	// Allows the object to override its name, as used for identifying itself in saved games.
+	// The default is to use the object's native name. That is fine for level actors, but in built games (not the editor) actors that are
+	// automatically spawned, such as the player's pawn, controller, and game state, get different names each time they are created.
+	// Returning an empty string means to use the object's native name.
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "SPUD Interface")
+	FString OverrideName() const; virtual FString OverrideName_Implementation() const { return FString(); }
 };
 
 UINTERFACE(MinimalAPI)

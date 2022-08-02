@@ -44,14 +44,25 @@ void USpudSubsystem::Deinitialize()
 }
 
 
-void USpudSubsystem::NewGame(bool CheckServerOnly)
+void USpudSubsystem::NewGame(bool bCheckServerOnly, bool bAfterLevelLoad)
 {
-	if (CheckServerOnly && !ServerCheck(true))
+	if (bCheckServerOnly && !ServerCheck(true))
 		return;
 		
 	EndGame();
-	CurrentState = ESpudSystemState::RunningIdle;
-	SubscribeAllLevelObjectEvents();
+	
+	// EndGame will have unsubscribed from all current levels
+	// Re-sub if we want to keep state for currently loaded levels, or not if starting from next level load
+	// This allows the caller to call NewGame mid-game and then load a map, and the current levels won't try to save
+	if (bAfterLevelLoad)
+	{
+		CurrentState = ESpudSystemState::NewGameOnNextLevel;
+	}
+	else
+	{
+		CurrentState = ESpudSystemState::RunningIdle;
+		SubscribeAllLevelObjectEvents();
+	}
 }
 
 bool USpudSubsystem::ServerCheck(bool LogWarning) const
@@ -176,21 +187,34 @@ void USpudSubsystem::OnPostLoadMap(UWorld* World)
 	if (!ServerCheck(false))
 		return;
 
-	// @third party code - BEGIN Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
-	//if (CurrentState == ESpudSystemState::RunningIdle ||
-	if (
-	// @third party code - END Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
-		CurrentState == ESpudSystemState::LoadingGame)
+	switch(CurrentState)
 	{
+	case ESpudSystemState::NewGameOnNextLevel:
+		if (IsValid(World)) // nullptr seems possible if load is aborted or something?
+		{
+			const FString LevelName = UGameplayStatics::GetCurrentLevelName(World);
+			UE_LOG(LogSpudSubsystem,
+				   Verbose,
+				   TEXT("OnPostLoadMap NewGame starting: %s"),
+				   *LevelName);
+			SubscribeLevelObjectEvents(World->GetCurrentLevel());
+		}
+		break;
+	// @third party code - BEGIN Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
+	//case ESpudSystemState::RunningIdle:
+	// @third party code - END Disable storing + restoring when travelling out of a map, we want saves + loads to be explicit
+	case ESpudSystemState::LoadingGame:
 		// This is called when a new map is loaded
 		// In all cases, we try to load the state
 		if (IsValid(World)) // nullptr seems possible if load is aborted or something?
 		{
-			FString LevelName = UGameplayStatics::GetCurrentLevelName(World); 
-			UE_LOG(LogSpudSubsystem, Verbose, TEXT("OnPostLoadMap restore: %s"),
+			const FString LevelName = UGameplayStatics::GetCurrentLevelName(World);
+			UE_LOG(LogSpudSubsystem,
+			       Verbose,
+			       TEXT("OnPostLoadMap restore: %s"),
 			       *LevelName);
 
-			auto State = GetActiveState();
+			const auto State = GetActiveState();
 			PreLevelRestore.Broadcast(LevelName);
 			State->RestoreLoadedWorld(World);
 			PostLevelRestore.Broadcast(LevelName, true);
@@ -204,6 +228,11 @@ void USpudSubsystem::OnPostLoadMap(UWorld* World)
 			LoadComplete(SlotNameInProgress, true);
 			UE_LOG(LogSpudSubsystem, Log, TEXT("Load: Success"));
 		}
+		
+		break;
+	default:
+		break;
+			
 	}
 
 	PostTravelToNewMap.Broadcast();
@@ -361,11 +390,12 @@ void USpudSubsystem::FinishSaveGame(const FString& SlotName, const FText& Title,
 
 void USpudSubsystem::SaveComplete(const FString& SlotName, bool bSuccess)
 {
+	CurrentState = ESpudSystemState::RunningIdle;
+	PostSaveGame.Broadcast(SlotName, bSuccess);
+	// It's possible that the reference to SlotName *is* SlotNameInProgress, so we can't reset it until after
 	SlotNameInProgress = "";
 	TitleInProgress = FText();
 	ExtraInfoInProgress = nullptr;
-	CurrentState = ESpudSystemState::RunningIdle;
-	PostSaveGame.Broadcast(SlotName, bSuccess);
 }
 
 void USpudSubsystem::HandleLevelLoaded(FName LevelName)
@@ -376,14 +406,17 @@ void USpudSubsystem::HandleLevelLoaded(FName LevelName)
 	GetActiveState()->PreLoadLevelData(LevelName.ToString());
 
 	AsyncTask(ENamedThreads::GameThread, [this, LevelName]()
+	{
+		// But also add a slight delay so we get a tick in between so physics works
+		FTimerHandle H;
+		if (UWorld* World = GetWorld())
 		{
-			// But also add a slight delay so we get a tick in between so physics works
-			FTimerHandle H;
-			GetWorld()->GetTimerManager().SetTimer(H, [this, LevelName]()
-				{
-					PostLoadStreamLevelGameThread(LevelName);
-				}, 0.01, false);
-		});
+			World->GetTimerManager().SetTimer(H, [this, LevelName]()
+			{
+				PostLoadStreamLevelGameThread(LevelName);
+			}, 0.01, false);
+		}
+	});
 }
 
 void USpudSubsystem::HandleLevelUnloaded(ULevel* Level)
@@ -560,8 +593,8 @@ void USpudSubsystem::WithdrawRequestForStreamingLevel(UObject* Requester, FName 
 
 	if (auto Request = LevelRequests.Find(LevelName))
 	{
-		Request->Requesters.Remove(Requester);
-		if (Request->Requesters.Num() == 0)
+		const int Removed = Request->Requesters.Remove(Requester);
+		if (Removed > 0 && Request->Requesters.Num() == 0)
 		{
 			// This level can be unloaded after time delay
 			Request->bPendingUnload = true;
