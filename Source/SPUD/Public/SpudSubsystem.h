@@ -353,6 +353,10 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly)
     void SaveGame(const FString& SlotName, const FText& Title = FText(), bool bTakeScreenshot = true, const USpudCustomSaveInfo* ExtraInfo = nullptr);
+	// @third party code - BEGIN Allow client to Load the map in Listen mode
+	void LoadGame(const FString& SlotName, bool bClientLoadingListen = false);
+	// @third party code - END Allow client to Load the map in Listen mode
+	
 	/**
 	 * Load the game in a given slot name. Asynchronous, use the PostLoadGame event to determine when load is complete (and success)
 	 * @param SlotName The slot name of the save to load
