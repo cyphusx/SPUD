@@ -12,7 +12,8 @@ bool SpudPropertyUtil::ShouldPropertyBeIncluded(FProperty* Property, bool IsChil
 	// Assume all actor components with the right interface wish to be persisted
 	if (const FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property))
 	{
-		if (ObjectProperty->PropertyClass->IsChildOf(UActorComponent::StaticClass())
+		if (ObjectProperty->PropertyClass
+			&& ObjectProperty->PropertyClass->IsChildOf(UActorComponent::StaticClass())
 			&& ObjectProperty->PropertyClass->ImplementsInterface(USpudComponent::StaticClass()))
 		{
 			return true;
