@@ -294,8 +294,11 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly)
     void SaveGame(const FString& SlotName, const FText& Title = FText(), bool bTakeScreenshot = true, const USpudCustomSaveInfo* ExtraInfo = nullptr);
 	/// Load the game in a given slot name. Asynchronous, use the PostLoadGame event to determine when load is complete (and success)
+	// @third party code - BEGIN Allow client to Load the map in Listen mode
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly)
-    void LoadGame(const FString& SlotName);
+    void LoadGame(const FString& SlotName, bool bClientLoadingListen = false);
+	//void LoadGame(const FString& SlotName);
+	// @third party code - END Allow client to Load the map in Listen mode
 
 	/// Delete the save game in a given slot
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly)

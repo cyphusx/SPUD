@@ -450,7 +450,10 @@ void USpudSubsystem::StoreLevel(ULevel* Level, bool bRelease, bool bBlocking)
 	PostLevelStore.Broadcast(LevelName, true);
 }
 
-void USpudSubsystem::LoadGame(const FString& SlotName)
+// @third party code - BEGIN  Allow client to Load the map in Listen mode
+void USpudSubsystem::LoadGame(const FString& SlotName, bool bClientLoadingListen)
+//void USpudSubsystem::LoadGame(const FString& SlotName)
+// @third party code - END  Allow client to Load the map in Listen mode
 {
 	if (!ServerCheck(true))
 	{
@@ -517,8 +520,11 @@ void USpudSubsystem::LoadGame(const FString& SlotName)
 	SlotNameInProgress = SlotName;
 	UE_LOG(LogSpudSubsystem, Verbose, TEXT("(Re)loading map: %s"), *State->GetPersistentLevel());		
 	// @third party code - BEGIN Stop clients being disconnected on load
+	static const FString ListenParam("?Listen");
+	const FString LoadMap = bClientLoadingListen ? State->GetPersistentLevel()+ListenParam : State->GetPersistentLevel();
+
+	GetWorld()->ServerTravel(LoadMap, true);
 	//UGameplayStatics::OpenLevel(GetWorld(), FName(State->GetPersistentLevel()));
-	GetWorld()->ServerTravel(State->GetPersistentLevel(), true);
 	// @third party code - END Stop clients being disconnected on load
 }
 
