@@ -217,12 +217,18 @@ FString USpudState::GetLevelNameForObject(const UObject* Obj)
 	const auto OuterMost = Obj->GetOutermost();
 	if (OuterMost)
 	{
-		FString LevelName;
-		OuterMost->GetName().Split("/", nullptr, &LevelName, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
-		// Strip off PIE prefix, "UEDPIE_N_" where N is a number
-		if (LevelName.StartsWith("UEDPIE_"))
-			LevelName = LevelName.Right(LevelName.Len() - 9);
-		return LevelName;
+		// @third party code - BEGIN Support for one-file-per-actor by traversing until we a substring matching our naming convention
+		
+		// FString LevelName;
+		// OuterMost->GetName().Split("/", nullptr, &LevelName, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+		// // Strip off PIE prefix, "UEDPIE_N_" where N is a number
+		// if (LevelName.StartsWith("UEDPIE_"))
+		// 	LevelName = LevelName.Right(LevelName.Len() - 9);
+		// return LevelName;
+
+		const TOptional<FString> LevelName = USpudState::GetGameLevelNameFromString(OuterMost->GetName());
+		return LevelName.Get("");
+		// @third party code - END Support for one-file-per-actor by traversing until we a substring matching our naming convention
 	}
 	else
 	{
@@ -1286,6 +1292,23 @@ bool USpudStateCustomData::IsStillInChunk(FString MagicID) const
 	return ChunkStack.Top()->IsStillInChunk(*GetUnderlyingArchive());
 	
 }
+
+// @third party code - BEGIN Added function for retrieving Game levels from package strings
+TOptional<FString> USpudState::GetGameLevelNameFromString(const FString& String)
+{
+	FString LevelName = String;
+	const int32 LevelNameIndex = LevelName.Find("/L_"); // Game levels begin with 'L_'
+	if (LevelNameIndex != INDEX_NONE)
+	{
+		LevelName.RemoveAt(0, LevelNameIndex + 1);
+		LevelName.Split("/", &LevelName, nullptr, ESearchCase::IgnoreCase, ESearchDir::FromStart);
+		return LevelName;
+	}
+
+	// No valid level substring found - return nothing
+	return TOptional<FString>();
+}
+// @third party code - END Added function for retrieving Game levels from package strings
 
 FString USpudState::GetActiveGameLevelFolder()
 {
