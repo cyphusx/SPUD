@@ -1374,6 +1374,23 @@ bool USpudStateCustomData::IsStillInChunk(FString MagicID) const
 	
 }
 
+// @third party code - BEGIN Added function for retrieving Game levels from package strings
+TOptional<FString> USpudState::GetGameLevelNameFromString(const FString& String)
+{
+	FString LevelName = String;
+	const int32 LevelNameIndex = LevelName.Find("/L_"); // Game levels begin with 'L_'
+	if (LevelNameIndex != INDEX_NONE)
+	{
+		LevelName.RemoveAt(0, LevelNameIndex + 1);
+		LevelName.Split("/", &LevelName, nullptr, ESearchCase::IgnoreCase, ESearchDir::FromStart);
+		return LevelName;
+	}
+
+	// No valid level substring found - return nothing
+	return TOptional<FString>();
+}
+// @third party code - END Added function for retrieving Game levels from package strings
+
 FString USpudState::GetActiveGameLevelFolder()
 {
 	return FString::Printf(TEXT("%sSpudCache/"), *FPaths::ProjectSavedDir());	
