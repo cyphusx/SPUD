@@ -16,8 +16,18 @@ DEFINE_LOG_CATEGORY(LogSpudState)
 
 USpudState::USpudState()
 {
+	// @third party code - BEGIN Prevent save/load errors due to client wiping SPUD cache in PIE
+
 	// In case game crashed etc, remove all garbage active level files at construction too
-	RemoveAllActiveGameLevelFiles();
+	//RemoveAllActiveGameLevelFiles();
+
+	// Don't do this for the CDO. It causes late joining PIE client instances to wipe the SPUD cache,
+	// causing load/save errors on the server PIE instance.
+	if (!IsTemplate())
+	{
+		RemoveAllActiveGameLevelFiles();
+	}
+	// @third party code - END Prevent save/load errors due to client wiping SPUD cache in PIE
 }
 
 void USpudState::ResetState()
@@ -1373,23 +1383,6 @@ bool USpudStateCustomData::IsStillInChunk(FString MagicID) const
 	return ChunkStack.Top()->IsStillInChunk(*GetUnderlyingArchive());
 	
 }
-
-// @third party code - BEGIN Added function for retrieving Game levels from package strings
-TOptional<FString> USpudState::GetGameLevelNameFromString(const FString& String)
-{
-	FString LevelName = String;
-	const int32 LevelNameIndex = LevelName.Find("/L_"); // Game levels begin with 'L_'
-	if (LevelNameIndex != INDEX_NONE)
-	{
-		LevelName.RemoveAt(0, LevelNameIndex + 1);
-		LevelName.Split("/", &LevelName, nullptr, ESearchCase::IgnoreCase, ESearchDir::FromStart);
-		return LevelName;
-	}
-
-	// No valid level substring found - return nothing
-	return TOptional<FString>();
-}
-// @third party code - END Added function for retrieving Game levels from package strings
 
 FString USpudState::GetActiveGameLevelFolder()
 {

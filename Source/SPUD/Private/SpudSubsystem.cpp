@@ -1479,6 +1479,14 @@ USpudCustomSaveInfo* USpudSubsystem::CreateCustomSaveInfo()
 
 void USpudSubsystem::Tick(float DeltaTime)
 {
+	// @third party code - BEGIN stop ticking on non-users
+	UWorld* World = GetWorld();
+	if (!World || World->GetNetMode() == ENetMode::NM_Client)
+	{
+		return;
+	}
+	// @third party code - END stop ticking on non-users
+  
 	if (ScreenshotTimeout > 0)
 	{
 		ScreenshotTimeout -= DeltaTime;
