@@ -1181,6 +1181,14 @@ USpudCustomSaveInfo* USpudSubsystem::CreateCustomSaveInfo()
 
 void USpudSubsystem::Tick(float DeltaTime)
 {
+	// @third party code - BEGIN stop ticking on non-users
+	UWorld* World = GetWorld();
+	if (!World || World->GetNetMode() == ENetMode::NM_Client)
+	{
+		return;
+	}
+	// @third party code - END stop ticking on non-users
+  
 	if (ScreenshotTimeout > 0)
 	{
 		ScreenshotTimeout -= DeltaTime;
@@ -1217,7 +1225,9 @@ void USpudSubsystem::Tick(float DeltaTime)
 			// Discard unloaded levels.
 			for (auto it = MonitoredStreamingLevels.CreateIterator(); it; ++it)
 			{
-				if (!streamingLevels.Contains(it.Key()))
+				// @third party code - BEGIN ensure that iterator points to non-null ULevelStreaming
+				if (ensure(it.Key()) && !streamingLevels.Contains(it.Key()))
+				// @third party code - END ensure that iterator points to non-null ULevelStreaming
 				{
 					UE_LOG(LogSpudSubsystem, Verbose, TEXT("Unloaded streaming level: %s"), *GetNameSafe(it.Key()));
 					check(!it.Key()->IsLevelVisible());

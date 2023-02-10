@@ -355,10 +355,6 @@ public:
 	/// This only reads the minimum needed to describe the save file and doesn't load any other data.
 	static bool LoadSaveInfoFromArchive(FArchive& SPUDAr, USpudSaveGameInfo& OutInfo);
 
-	// @third party code - BEGIN Added function for retrieving Game levels from package strings
-	static TOptional<FString> GetGameLevelNameFromString(const FString& String);
-	// @third party code - END Added function for retrieving Game levels from package strings
-
 	bool bTestRequireSlowPath = false;
 	bool bTestRequireFastPath = false;
 	
