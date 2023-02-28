@@ -203,18 +203,13 @@ void USpudState::WriteCoreActorData(AActor* Actor, FArchive& Out) const
 
 FString USpudState::GetLevelName(const ULevel* Level)
 {
-	// FName isn't good enough, it's "PersistentLevel" rather than the actual map name
-	// Using the Outer to get the package name does it, same as for any other object
-	return GetLevelNameForObject(Level);
-}
-FString USpudState::GetLevelNameForObject(const UObject* Obj)
-{
 	// Detect what level an object originated from
 	// GetLevel()->GetName / GetFName() returns "PersistentLevel" all the time
 	// GetLevel()->GetPathName returns e.g. /Game/Maps/[UEDPIE_0_]TestAdventureMap.TestAdventureMap:PersistentLevel
 	// Outer is "PersistentLevel"
 	// Outermost is "/Game/Maps/[UEDPIE_0_]TestAdventureStream0" so that's what we want
-	const auto OuterMost = Obj->GetOutermost();
+	// Note that using Actor->GetOutermost() with WorldPartition will return some wrapper object.
+	const auto OuterMost = Level->GetOutermost();
 	if (OuterMost)
 	{
 		// @third party code - BEGIN Support for one-file-per-actor by traversing until we a substring matching our naming convention
@@ -233,7 +228,12 @@ FString USpudState::GetLevelNameForObject(const UObject* Obj)
 	else
 	{
 		return FString();
-	}	
+	}
+}
+
+FString USpudState::GetLevelNameForActor(const AActor* Actor)
+{
+	return GetLevelName(Actor->GetLevel());
 }
 
 FSpudSaveData::TLevelDataPtr USpudState::GetLevelData(const FString& LevelName, bool AutoCreate)
@@ -314,21 +314,21 @@ FSpudSpawnedActorData* USpudState::GetSpawnedActorData(AActor* Actor, FSpudSaveD
 	return Ret;
 }
 
-void USpudState::StoreActor(AActor* Obj)
+void USpudState::StoreActor(AActor* Actor)
 {
-	if (Obj->HasAnyFlags(RF_ClassDefaultObject|RF_ArchetypeObject|RF_BeginDestroyed))
+	if (Actor->HasAnyFlags(RF_ClassDefaultObject|RF_ArchetypeObject|RF_BeginDestroyed))
 		return;
 
-	const FString LevelName = GetLevelNameForObject(Obj);
+	const FString LevelName = GetLevelNameForActor(Actor);
 
 	auto LevelData = GetLevelData(LevelName, true);
-	StoreActor(Obj, LevelData);
+	StoreActor(Actor, LevelData);
 		
 }
 
 void USpudState::StoreLevelActorDestroyed(AActor* Actor)
 {
-	const FString LevelName = GetLevelNameForObject(Actor);
+	const FString LevelName = GetLevelNameForActor(Actor);
 
 	auto LevelData = GetLevelData(LevelName, true);
 	StoreLevelActorDestroyed(Actor, LevelData);
@@ -484,7 +484,7 @@ void USpudState::RestoreActor(AActor* Actor)
 	if (Actor->HasAnyFlags(RF_ClassDefaultObject|RF_ArchetypeObject|RF_BeginDestroyed))
 		return;
 
-	const FString LevelName = GetLevelNameForObject(Actor);
+	const FString LevelName = GetLevelNameForActor(Actor);
 
 	auto LevelData = GetLevelData(LevelName, false);
 	if (!LevelData.IsValid())
@@ -1035,7 +1035,7 @@ void USpudState::StoreActor(AActor* Actor, FSpudSaveData::TLevelDataPtr LevelDat
 				}
 			}
 #endif
-			
+
 		}
 	}
 
