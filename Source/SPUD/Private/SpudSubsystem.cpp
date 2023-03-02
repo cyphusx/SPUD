@@ -70,6 +70,18 @@ void USpudSubsystem::Deinitialize()
 		if (ensure(Level))
 		{
 			USpudStreamingLevelWrapper* const Wrapper = It.Value();
+
+			// @third party code - BEGIN Tell all visible levels to save themselves, as we're shutting down
+    		if (Level->IsLevelVisible())
+            {
+                UE_LOG(LogSpudSubsystem, Verbose, TEXT("Firing OnLevelHidden for streaming level as shutting down: %s"), *GetNameSafe(Level));
+
+                // We need to fire this now in order to ensure it's state gets saved
+                // before USpudSubsystem is destroyed
+                Wrapper->OnLevelHidden();
+            }
+			// @third party code - END Tell all visible levels to save themselves, as we're shutting down
+    
 			Level->OnLevelShown.RemoveAll(Wrapper);
 			Level->OnLevelHidden.RemoveAll(Wrapper);
 			It.RemoveCurrent();
