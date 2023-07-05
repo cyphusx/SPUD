@@ -5,6 +5,8 @@
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 
+class FSpudMemoryReader;
+class FSpudMemoryWriter;
 DECLARE_LOG_CATEGORY_EXTERN(LogSpudProps, Verbose, Verbose);
 namespace{
 /// Type info for persistence
@@ -146,11 +148,17 @@ public:
 	static bool IsPropertySupported(FProperty* Property);
 	
 	/**
-	 * @brief Return wether a specified property is natively supported, with full upgrade functionality
+	 * @brief Return whether a specified property is natively supported, with full upgrade functionality
 	 * @param Property the property in question
 	 * @return Whether this property is supported in the persistence system
 	 */
 	static bool IsPropertyNativelySupported(FProperty* Property);
+	/**
+	 * @brief Return whether a specified property is supported, as a fallback
+	 * @param Property the property in question
+	 * @return Whether this property is supported in the persistence system even if not natively
+	 */
+	static bool IsPropertyFallbackSupported(FProperty* Property);
 	/**
 	 * @brief Return whether a property is of a built-in struct 
 	 * @param SProp The struct property
@@ -221,7 +229,7 @@ public:
 	                          TSharedPtr<FSpudClassDef> ClassDef,
 	                          TArray<uint32>& PropertyOffsets,
 	                          FSpudClassMetadata& Meta,
-	                          FMemoryWriter& Out);
+	                          FSpudMemoryWriter& Out);
 	static void StoreArrayProperty(FArrayProperty* AProp,
 	                               const UObject* RootObject,
 	                               uint32 PrefixID,
@@ -230,7 +238,7 @@ public:
 	                               TSharedPtr<FSpudClassDef> ClassDef,
 	                               TArray<uint32>& PropertyOffsets,
 	                               FSpudClassMetadata& Meta,
-	                               FMemoryWriter& Out);
+	                               FSpudMemoryWriter& Out);
 	static void StoreContainerProperty(FProperty* Property,
 	                                   const UObject* RootObject,
 	                                   uint32 PrefixID,
@@ -240,7 +248,7 @@ public:
 	                                   TSharedPtr<FSpudClassDef> ClassDef,
 	                                   TArray<uint32>& PropertyOffsets,
 	                                   FSpudClassMetadata& Meta,
-	                                   FMemoryWriter& Out);
+	                                   FSpudMemoryWriter& Out);
 
 
 	typedef TMap<FGuid, UObject*> RuntimeObjectMap;
@@ -249,17 +257,17 @@ public:
 	                            const FSpudPropertyDef& StoredProperty,
 	                            const RuntimeObjectMap* RuntimeObjects,
 	                            const FSpudClassMetadata& Meta,
-	                            int Depth, FMemoryReader& DataIn);
+	                            int Depth, FSpudMemoryReader& DataIn);
 	static void RestoreArrayProperty(UObject* RootObject, FArrayProperty* const AProp, void* ContainerPtr,
 	                                 const FSpudPropertyDef& StoredProperty,
 	                                 const RuntimeObjectMap* RuntimeObjects,
 	                                 const FSpudClassMetadata& Meta,
-	                                 int Depth, FMemoryReader& DataIn);
+	                                 int Depth, FSpudMemoryReader& DataIn);
 	static void RestoreContainerProperty(UObject* RootObject, FProperty* const Property,
 	                                     void* ContainerPtr, const FSpudPropertyDef& StoredProperty,
 	                                     const RuntimeObjectMap* RuntimeObjects,
 	                                     const FSpudClassMetadata& Meta,
-	                                     int Depth, FMemoryReader& DataIn);
+	                                     int Depth, FSpudMemoryReader& DataIn);
 
 
 	/// Utility function for checking whether iterating through the properties on a UObject results in the same

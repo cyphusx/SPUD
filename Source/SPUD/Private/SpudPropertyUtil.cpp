@@ -1,6 +1,7 @@
 #include "SpudPropertyUtil.h"
 #include <limits>
 #include "ISpudObject.h"
+#include "..\Public\SpudMemoryReaderWriter.h"
 
 DEFINE_LOG_CATEGORY(LogSpudProps)
 
@@ -48,6 +49,12 @@ bool SpudPropertyUtil::IsPropertyNativelySupported(FProperty* Property)
 		return false;
 	}
 
+	return true;
+}
+
+bool SpudPropertyUtil::IsPropertyFallbackSupported(FProperty* Property)
+{
+	// No limitations currently known?
 	return true;
 }
 
@@ -803,7 +810,7 @@ void SpudPropertyUtil::StoreProperty(const UObject* RootObject,
                                      TSharedPtr<FSpudClassDef> ClassDef,
                                      TArray<uint32>& PropertyOffsets,
                                      FSpudClassMetadata& Meta,
-                                     FMemoryWriter& Out)
+                                     FSpudMemoryWriter& Out)
 {
 	// Arrays supported, but not maps / sets yet
 	if (const auto AProp = CastField<FArrayProperty>(Property))
@@ -827,7 +834,7 @@ void SpudPropertyUtil::StoreArrayProperty(FArrayProperty* AProp,
                                           TSharedPtr<FSpudClassDef> ClassDef,
                                           TArray<uint32>& PropertyOffsets,
                                           FSpudClassMetadata& Meta,
-                                          FMemoryWriter& Out)
+                                          FSpudMemoryWriter& Out)
 {
 	
 	// Use helper to get number, ArrayDim doesn't seem to work?
@@ -863,9 +870,9 @@ void SpudPropertyUtil::StoreContainerProperty(FProperty* Property,
                                               TSharedPtr<FSpudClassDef> ClassDef,
                                               TArray<uint32>& PropertyOffsets,
                                               FSpudClassMetadata& Meta,
-                                              FMemoryWriter& Out)
+                                              FSpudMemoryWriter& Out)
 {
-	bool bUpdateOK;
+	bool bUpdateOK = false;
 	if (IsPropertyNativelySupported(Property))
 	{
 		// Get pointer to data within container, must be from original property in the case of arrays
@@ -912,7 +919,7 @@ void SpudPropertyUtil::StoreContainerProperty(FProperty* Property,
 		
 		}
 	}
-	else
+	else if (IsPropertyFallbackSupported(Property))
 	{
 		// Not a fully supported type, wrap in an FRecord as an opaque type
 		// Not super efficient but useful for plugging gaps in things we support
@@ -937,7 +944,7 @@ void SpudPropertyUtil::RestoreProperty(UObject* RootObject, FProperty* Property,
                                              const RuntimeObjectMap* RuntimeObjects,
                                              const FSpudClassMetadata& Meta,
                                              int Depth,
-                                             FMemoryReader& DataIn)
+                                             FSpudMemoryReader& DataIn)
 {
 	// Arrays supported, but not maps / sets yet
 	if (const auto AProp = CastField<FArrayProperty>(Property))
@@ -959,7 +966,7 @@ void SpudPropertyUtil::RestoreArrayProperty(UObject* RootObject, FArrayProperty*
                                                   const RuntimeObjectMap* RuntimeObjects,
                                                   const FSpudClassMetadata& Meta,
                                                   int Depth,
-                                                  FMemoryReader& DataIn)
+                                                  FSpudMemoryReader& DataIn)
 {
 
 	// Array properties store the count as a uint16 first
@@ -984,7 +991,7 @@ void SpudPropertyUtil::RestoreContainerProperty(UObject* RootObject, FProperty* 
                                                       const RuntimeObjectMap* RuntimeObjects,
                                                       const FSpudClassMetadata& Meta,
                                                       int Depth,
-                                                      FMemoryReader& DataIn)
+                                                      FSpudMemoryReader& DataIn)
 {
 	bool bUpdateOK;
 
@@ -1035,7 +1042,19 @@ void SpudPropertyUtil::RestoreContainerProperty(UObject* RootObject, FProperty* 
 			
 				ULevel* Level = nullptr;
 				if (auto Actor = Cast<AActor>(RootObject))
+				{
 					Level = Actor->GetLevel();
+				}
+				if (!IsValid(Level))
+				{
+					if (UActorComponent* ActorComponentLevelCheck = Cast<UActorComponent>(RootObject))
+					{
+						if (IsValid(ActorComponentLevelCheck->GetOwner()->GetLevel()))
+						{
+							Level = ActorComponentLevelCheck->GetOwner()->GetLevel();
+						}
+					}
+				}
 				bUpdateOK = TryReadUObjectPropertyData(Property, DataPtr, StoredProperty, RuntimeObjects, Level, RootObject, Meta, Depth, DataIn);
 			}
 		

@@ -3,7 +3,6 @@
 #include "SpudState.h"
 #include "TestSaveObject.h"
 
-PRAGMA_DISABLE_OPTIMIZATION
 
 template<typename T>
 void PopulateAllTypes(T& Obj)
@@ -30,6 +29,13 @@ void PopulateAllTypes(T& Obj)
 	Obj.UObjectVal = NewObject<UTestNestedUObject>();
 	Obj.UObjectVal->NestedIntVal = 96;
 	Obj.UObjectVal->NestedStringVal = "A string inside a nested UObject";
+	Obj.TObjectPtrVal = NewObject<UTestNestedUObject>();
+	Obj.TObjectPtrVal->NestedIntVal = 123;
+	Obj.TObjectPtrVal->NestedStringVal = "A string inside a nested TObjectPtr";
+
+	Obj.TObjectPtrArray.Add(NewObject<UTestNestedUObject>());
+	Obj.TObjectPtrArray[0]->NestedIntVal = 123;
+	Obj.TObjectPtrArray[0]->NestedStringVal = "A string inside a nested TObjectPtr array";
 
 	Obj.ActorSubclass = AStaticMeshActor::StaticClass();
 	Obj.ActorSubclassArray.Add(AStaticMeshActor::StaticClass());
@@ -143,6 +149,21 @@ void CheckAllTypes(FAutomationTestBase* Test, const FString& Prefix, const T& Ac
 	{
 		Test->TestEqual(Prefix + "UObject String should match", Actual.UObjectVal->NestedStringVal, Expected.UObjectVal->NestedStringVal);
 		Test->TestEqual(Prefix + "UObject Int should match", Actual.UObjectVal->NestedIntVal, Expected.UObjectVal->NestedIntVal);
+		
+	}
+	
+	Test->TestTrue(Prefix + "TObjectPtr shouldn't be null", (bool)Actual.TObjectPtrVal);
+	if (Actual.TObjectPtrVal)
+	{
+		Test->TestEqual(Prefix + "UObject String should match", Actual.TObjectPtrVal->NestedStringVal, Expected.TObjectPtrVal->NestedStringVal);
+		Test->TestEqual(Prefix + "UObject Int should match", Actual.TObjectPtrVal->NestedIntVal, Expected.TObjectPtrVal->NestedIntVal);
+		
+	}
+
+	if (Test->TestEqual(Prefix + "TObjectPtr array should have one entry", Actual.TObjectPtrArray.Num(), Expected.TObjectPtrArray.Num()))
+	{
+		Test->TestEqual(Prefix + "UObject String should match", Actual.TObjectPtrArray[0]->NestedStringVal, Expected.TObjectPtrArray[0]->NestedStringVal);
+		Test->TestEqual(Prefix + "UObject Int should match", Actual.TObjectPtrArray[0]->NestedIntVal, Expected.TObjectPtrArray[0]->NestedIntVal);
 		
 	}
 
@@ -434,5 +455,3 @@ bool FTestNonNative::RunTest(const FString& Parameters)
 
 	return true;
 }
-
-PRAGMA_ENABLE_OPTIMIZATION

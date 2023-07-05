@@ -34,7 +34,7 @@ The following property types are fully supported, either as single entries, and 
   * Weak references: `TWeakObjectPtr<AActor>` and subclasses
 
 The following property types are fully supported as individual items, but
-have **caveats for arrays**:
+have **caveats for arrays and maps**:
 
 * Custom UStructs
 * Nested UObject instances (null preserving, will re-instantiate based on property type)
@@ -46,7 +46,6 @@ as "opaque" records using UE's own internal serialisation methods. This means SP
 doesn't "look inside" them, it just saves/restores them as a blob, and cannot 
 support SPUD's additional special processing such as retaining links between actors
 in these properties. But for simple stand-alone state retention, they will work.
-
 
 ## Upgrading Properties
 
