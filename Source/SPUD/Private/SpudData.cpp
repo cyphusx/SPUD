@@ -10,7 +10,10 @@
 DEFINE_LOG_CATEGORY(LogSpudData)
 
 // System version covers our internal format changes
-#define SPUD_CURRENT_SYSTEM_VERSION 2
+// @third party code - BEGIN Add bounds to spawned actor data
+//#define SPUD_CURRENT_SYSTEM_VERSION 2
+#define SPUD_CURRENT_SYSTEM_VERSION 3
+// @third party code - END Add bounds to spawned actor data
 
 // int32 so that Blueprint-compatible. 2 billion should be enough anyway and you can always use the negatives
 int32 GCurrentUserDataModelVersion = 0;
@@ -413,6 +416,9 @@ void FSpudSpawnedActorData::WriteToArchive(FSpudChunkedDataArchive& Ar)
 	{
 		Ar << ClassID;
 		Ar << Guid;
+		// @third party code - BEGIN Add bounds to spawned actor data
+		Ar << Bounds;
+		// @third party code - BEGIN Add bounds to spawned actor data
 		CoreData.WriteToArchive(Ar);
 		Properties.WriteToArchive(Ar);
 		CustomData.WriteToArchive(Ar);
@@ -426,6 +432,12 @@ void FSpudSpawnedActorData::ReadFromArchive(FSpudChunkedDataArchive& Ar, uint32 
 	{
 		Ar << ClassID;
 		Ar << Guid;
+		// @third party code - BEGIN Add bounds to spawned actor data
+		if (StoredSystemVersion >= 3)
+		{
+			Ar << Bounds;
+		}
+		// @third party code - END Add bounds to spawned actor data
 		CoreData.ReadFromArchive(Ar, StoredSystemVersion);
 		Properties.ReadFromArchive(Ar, StoredSystemVersion);
 		CustomData.ReadFromArchive(Ar, StoredSystemVersion);

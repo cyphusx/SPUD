@@ -516,7 +516,11 @@ public:
 	virtual bool IsTickableWhenPaused() const override;
 	virtual TStatId GetStatId() const override;
 	// FTickableGameObject end
-	
+
+	// @third party code - BEGIN Add support for runtime spawned actors in WP
+	void StoreRuntimeSpawnedActor(AActor& Actor);
+	void RestoreRuntimeSpawnedActors(const UWorld& World, const USpudState::FLoadCondition& LoadCondition);
+	// @third party code - END Add support for runtime spawned actors in WP
 };
 
 inline USpudSubsystem* GetSpudSubsystem(UWorld* WorldContext)

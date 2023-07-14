@@ -363,6 +363,9 @@ struct SPUD_API FSpudSpawnedActorData : public FSpudObjectData
 {
 	uint32 ClassID; // ID for the ClassName (see FSpudClassNameIndex) 
 	FGuid Guid;
+    // @third party code - BEGIN add bounds to spawned actor data
+    FBox Bounds;
+    // @third party code - END add bounds to spawned actor data
 
 	/// Key value for indexing this item; name is unique in the level
 	FString Key() const { return Guid.ToString(SPUDDATA_GUID_KEY_FORMAT); }
