@@ -372,6 +372,13 @@ public:
 	/// This only reads the minimum needed to describe the save file and doesn't load any other data.
 	static bool LoadSaveInfoFromArchive(FArchive& SPUDAr, USpudSaveGameInfo& OutInfo);
 
+	// @third party code - BEGIN Add support for runtime spawned actors in WP
+	using FLoadCondition = TFunction<bool(const FBox&)>;
+	
+	void StoreRuntimeSpawnedActor(AActor& Actor);
+	void RestoreRuntimeSpawnedActors(const UWorld& World, const FLoadCondition& LoadCondition);
+	// @third party code - END Add support for runtime spawned actors in WP
+	
 	bool bTestRequireSlowPath = false;
 	bool bTestRequireFastPath = false;
 	

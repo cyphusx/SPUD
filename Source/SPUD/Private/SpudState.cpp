@@ -339,6 +339,9 @@ FSpudSpawnedActorData* USpudState::GetSpawnedActorData(AActor* Actor, FSpudSaveD
 		Ret->Guid = Guid;
 		const FString ClassName = SpudPropertyUtil::GetClassName(Actor); 
 		Ret->ClassID = LevelData->Metadata.FindOrAddClassIDFromName(ClassName);
+		// @third party code - BEGIN Add bounds to spawned actor data
+		Ret->Bounds = Actor->GetComponentsBoundingBox();
+		// @third party code - BEGIN Add bounds to spawned actor data
 	}
 	
 	return Ret;
@@ -905,7 +908,7 @@ void USpudState::RestorePropertyVisitor::RestoreNestedUObjectIfNeeded(UObject* R
 			if (Obj)
 			{
 				auto Format = ESpudObjectStoreFormat::NestedProperties;
-				if (ParentState->SaveData.Info.SystemVersion >= 3)
+				if (ParentState->SaveData.Info.SystemVersion >= 4)
 				{
 					SpudPropertyUtil::ReadRaw(Format, DataIn);
 				}
@@ -1489,3 +1492,80 @@ TArray<FString> USpudState::GetLevelNames(bool bLoadedOnly)
 	}
 	return Ret;
 }
+
+// @third party code - BEGIN Add support for runtime spawned actors in WP
+namespace
+{
+FString RSA_LEVEL_NAME {TEXT("RuntimeSpawnedActorsLevel")};
+}
+
+void USpudState::StoreRuntimeSpawnedActor(AActor& Actor)
+{
+	const FSpudSaveData::TLevelDataPtr RSALevelData = GetLevelData(RSA_LEVEL_NAME, true);
+
+	AActor* ActorPtr = &Actor;
+	
+	// We manage the level data for the RSAs somewhat differently to the other level datas, in
+	// that we should never reset the data.  We add and remove serialized RSAs at runtime,
+	// and whatever is in the level data gets persisted to disk when we save the game.
+
+	if (RSALevelData.IsValid())
+	{
+		if (SpudPropertyUtil::IsPersistentObject(ActorPtr))
+		{
+			// @third party code - BEGIN Support not saving some ISpudObjects based on their internal state
+			//StoreActor(Actor, LevelData);
+			if (!ISpudObject::Execute_ShouldSkipStore(ActorPtr))
+			{
+				StoreActor(ActorPtr, RSALevelData);
+			}
+			// @third party code - END Support not saving some ISpudObjects based on their internal state
+		}
+	}
+}
+
+void USpudState::RestoreRuntimeSpawnedActors(const UWorld& World, const FLoadCondition& LoadCondition)
+{
+	const FSpudSaveData::TLevelDataPtr RSALevelData = GetLevelData(RSA_LEVEL_NAME, true);
+	if (RSALevelData.IsValid())
+	{
+		// Mutex lock the level (load and unload events on streaming can be in loading threads)
+		FScopeLock LevelLock(&RSALevelData->Mutex);
+
+		ULevel* PersistentLevel = World.GetLevel(0);
+		
+		TMap<FGuid, UObject*> RuntimeObjectsByGuid;
+		// Respawn dynamic actors first; they need to exist in order for cross-references in level actors to work
+		for (auto It = RSALevelData->SpawnedActors.Contents.CreateIterator(); It; ++It)
+		{
+			const FSpudSpawnedActorData& SpawnedActorData = It.Value(); 
+			if (!LoadCondition(SpawnedActorData.Bounds))
+			{
+				continue;
+			}
+			if (AActor* Actor = RespawnActor(SpawnedActorData, RSALevelData->Metadata, PersistentLevel))
+			{
+				RuntimeObjectsByGuid.Add(SpawnedActorData.Guid, Actor);
+			}
+			else
+			{
+				UE_LOG(LogSpudState, Warning, TEXT("Failed to respawn actor!"));
+			}
+			// Spawned actors will have been added to Level->Actors, their state will be restored there
+		}
+		// Restore existing actor state
+		for (auto Pair : RuntimeObjectsByGuid)
+		{
+			if (AActor* SpawnedActor = Cast<AActor>(Pair.Value))
+			{
+				RestoreActor(SpawnedActor, RSALevelData, &RuntimeObjectsByGuid);
+				RSALevelData->SpawnedActors.Contents.Remove(Pair.Key.ToString(SPUDDATA_GUID_KEY_FORMAT));
+			}
+			else
+			{
+				UE_LOG(LogSpudState, Warning, TEXT("Non-actor in RuntimeObjectsByGuid!"));
+			}
+		}
+	}
+}
+// @third party code - END Add support for runtime spawned actors in WP

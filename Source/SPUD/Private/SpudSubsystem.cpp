@@ -1607,3 +1607,14 @@ void USpudStreamingLevelWrapper::OnLevelHidden()
 	else
 		UE_LOG(LogSpudSubsystem, Verbose, TEXT("No loaded level"));
 }
+
+// @third party code - BEGIN Add support for runtime spawned actors in WP
+void USpudSubsystem::StoreRuntimeSpawnedActor(AActor& Actor)
+{
+	GetActiveState()->StoreRuntimeSpawnedActor(Actor);
+}
+void USpudSubsystem::RestoreRuntimeSpawnedActors(const UWorld& World, const USpudState::FLoadCondition& LoadCondition)
+{
+	GetActiveState()->RestoreRuntimeSpawnedActors(World, LoadCondition);
+}
+// @third party code - END Add support for runtime spawned actors in WP
