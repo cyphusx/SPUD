@@ -315,7 +315,7 @@ FSpudSpawnedActorData* USpudState::GetSpawnedActorData(AActor* Actor, FSpudSaveD
 		const FString ClassName = SpudPropertyUtil::GetClassName(Actor); 
 		Ret->ClassID = LevelData->Metadata.FindOrAddClassIDFromName(ClassName);
 		// @third party code - BEGIN Add bounds to spawned actor data
-		Ret->Bounds = Actor->GetComponentsBoundingBox();
+		Ret->Bounds = Actor->GetComponentsBoundingBox(true);
 		// @third party code - BEGIN Add bounds to spawned actor data
 	}
 	
@@ -1398,49 +1398,100 @@ TArray<FString> USpudState::GetLevelNames(bool bLoadedOnly)
 // @third party code - BEGIN Add support for runtime spawned actors in WP
 namespace
 {
+// DEPRECATED!  Only here to ensure that old save games will load their RSAs
 FString RSA_LEVEL_NAME {TEXT("RuntimeSpawnedActorsLevel")};
+
+// The size of the cells that we spatially bin the RSAs into - changing this
+// invalidates all RSAs in previous save games
+int32 RSA_SPATIAL_CELL_SIZE { 12800 };
 }
 
-void USpudState::StoreRuntimeSpawnedActor(AActor& Actor)
+// How long to keep an RSA cell in memory before flushing it to disk
+static TAutoConsoleVariable<float> CVarRSASpatialCellInactiveTimeSecs(
+	TEXT("spud.rsa.SpatialCellInactiveTimeSecs"),
+	300.f,
+	TEXT("Number of seconds after the last time an RSA cell was accessed before it is flushed to disk"),
+	ECVF_Default);
+
+static TAutoConsoleVariable<bool> CVarRSADebugDrawEnabled(
+	TEXT("spud.rsa.DebugDrawEnabled"),
+	false,
+	TEXT("Enables the drawing of the bounds considered for respawning RSAs"),
+	ECVF_Default);
+
+USpudState::FSpudStateRSALevelCoord USpudState::GetLevelCoordsFromLocation(const FVector& Location) const
 {
-	const FSpudSaveData::TLevelDataPtr RSALevelData = GetLevelData(RSA_LEVEL_NAME, true);
-
-	AActor* ActorPtr = &Actor;
-	
-	// We manage the level data for the RSAs somewhat differently to the other level datas, in
-	// that we should never reset the data.  We add and remove serialized RSAs at runtime,
-	// and whatever is in the level data gets persisted to disk when we save the game.
-
-	if (RSALevelData.IsValid())
+	return FSpudStateRSALevelCoord
 	{
-		if (SpudPropertyUtil::IsPersistentObject(ActorPtr))
+		static_cast<int32>(FMath::Floor(Location.X / RSA_SPATIAL_CELL_SIZE)),
+		static_cast<int32>(FMath::Floor(Location.Y / RSA_SPATIAL_CELL_SIZE))
+	};
+}
+
+FString USpudState::GetLevelNameFromLevelCoords(const FSpudStateRSALevelCoord Coord) const
+{
+	return FString::Printf(TEXT("RSACell%d_X%d_Y%d"), RSA_SPATIAL_CELL_SIZE, Coord.Key, Coord.Value);
+}
+
+void USpudState::GetLevelCoordsFromBounds(const FBox& Bounds, TSet<FSpudStateRSALevelCoord>& OutCoords) const
+{
+	const FSpudStateRSALevelCoord MinCoord = GetLevelCoordsFromLocation(Bounds.Min);
+	const FSpudStateRSALevelCoord MaxCoord = GetLevelCoordsFromLocation(Bounds.Max);
+	// Iterate over one more cell in each direction, so we catch any actors that
+	// overlap a boundary. This means actor non-colliding bounds must be less than
+	// two cell widths on either side.  Ideally, actor bounds should fit inside
+	// a cell.
+	for (int32 x = MinCoord.Key - 1; x <= MaxCoord.Key + 1; ++x)
+	{
+		for (int32 y = MinCoord.Value - 1; y <= MaxCoord.Value + 1; ++y)
 		{
-			// @third party code - BEGIN Support not saving some ISpudObjects based on their internal state
-			//StoreActor(Actor, LevelData);
-			if (!ISpudObject::Execute_ShouldSkipStore(ActorPtr))
-			{
-				StoreActor(ActorPtr, RSALevelData);
-			}
-			// @third party code - END Support not saving some ISpudObjects based on their internal state
+			OutCoords.Emplace({x, y});
 		}
 	}
 }
 
-void USpudState::RestoreRuntimeSpawnedActors(const UWorld& World, const FLoadCondition& LoadCondition)
+void USpudState::StoreRuntimeSpawnedActor(AActor& Actor)
 {
-	const FSpudSaveData::TLevelDataPtr RSALevelData = GetLevelData(RSA_LEVEL_NAME, true);
+	AActor* ActorPtr = &Actor;
+
+	// We manage the level data for the RSAs somewhat differently to the other level datas, in
+	// that we should never reset the data.  We add and remove serialized RSAs at runtime,
+	// and whatever is in the level data gets persisted to disk when we save the game.
+
+	if (SpudPropertyUtil::IsPersistentObject(ActorPtr))
+	{
+		// @third party code - BEGIN Support not saving some ISpudObjects based on their internal state
+		// StoreActor(Actor, LevelData);
+		if (!ISpudObject::Execute_ShouldSkipStore(ActorPtr))
+		{
+			const FVector ActorBoundsCenter = Actor.GetComponentsBoundingBox(true).GetCenter();
+			const FSpudStateRSALevelCoord Coord = GetLevelCoordsFromLocation(ActorBoundsCenter);
+			const FString LevelName = GetLevelNameFromLevelCoords(Coord);
+			const FSpudSaveData::TLevelDataPtr RSALevelData = GetLevelData(LevelName, true);
+			if (RSALevelData.IsValid())
+			{
+				StoreActor(ActorPtr, RSALevelData);
+			}
+		}
+		// @third party code - END Support not saving some ISpudObjects based on
+	}
+}
+
+void USpudState::RestoreRuntimeSpawnedActorsFromLevel(const UWorld& World, const FLoadCondition& LoadCondition, const FString& LevelName)
+{
+	const FSpudSaveData::TLevelDataPtr RSALevelData = GetLevelData(LevelName, false);
 	if (RSALevelData.IsValid())
 	{
 		// Mutex lock the level (load and unload events on streaming can be in loading threads)
 		FScopeLock LevelLock(&RSALevelData->Mutex);
 
 		ULevel* PersistentLevel = World.GetLevel(0);
-		
+
 		TMap<FGuid, UObject*> RuntimeObjectsByGuid;
 		// Respawn dynamic actors first; they need to exist in order for cross-references in level actors to work
 		for (auto It = RSALevelData->SpawnedActors.Contents.CreateIterator(); It; ++It)
 		{
-			const FSpudSpawnedActorData& SpawnedActorData = It.Value(); 
+			const FSpudSpawnedActorData& SpawnedActorData = It.Value();
 			if (!LoadCondition(SpawnedActorData.Bounds))
 			{
 				continue;
@@ -1467,6 +1518,69 @@ void USpudState::RestoreRuntimeSpawnedActors(const UWorld& World, const FLoadCon
 			{
 				UE_LOG(LogSpudState, Warning, TEXT("Non-actor in RuntimeObjectsByGuid!"));
 			}
+		}
+	}
+}
+
+void USpudState::RestoreRuntimeSpawnedActors(const UWorld& World, const TArray<FBox>& Bounds, const FLoadCondition& LoadCondition)
+{
+	TSet<FSpudStateRSALevelCoord> Coords;
+	for (const FBox& Bound : Bounds)
+	{
+		GetLevelCoordsFromBounds(Bound, Coords);
+	}
+
+	UE_LOG(LogSpudState, VeryVerbose, TEXT("Number of RSA cells being iterated over: %d"), Coords.Num());
+
+	// Restore from RSA_LEVEL_NAME first, as old saves may have this instead of
+	// the cell data.  Remove this after people have had the chance to save in
+	// the new format.
+	RestoreRuntimeSpawnedActorsFromLevel(World, LoadCondition, RSA_LEVEL_NAME);
+	
+	for (const FSpudStateRSALevelCoord& Coord : Coords)
+	{
+		const FString LevelName = GetLevelNameFromLevelCoords(Coord);
+		RestoreRuntimeSpawnedActorsFromLevel(World, LoadCondition, LevelName);
+
+		if (CVarRSADebugDrawEnabled.GetValueOnAnyThread())
+		{
+			const FVector CoordCentre
+			{
+				(Coord.Key * RSA_SPATIAL_CELL_SIZE) + (RSA_SPATIAL_CELL_SIZE / 2.0),
+				(Coord.Value * RSA_SPATIAL_CELL_SIZE) + (RSA_SPATIAL_CELL_SIZE / 2.0),
+				0.f
+			};
+
+			static const FVector CoordExtents
+			{
+				RSA_SPATIAL_CELL_SIZE / 2.0,
+				RSA_SPATIAL_CELL_SIZE / 2.0,
+				1000.0
+			};
+				
+			DrawDebugBox(&World, CoordCentre, CoordExtents, FColor::Orange);
+		}
+		
+		RSACellLastAccessedTimes.FindOrAdd(Coord) = World.GetTimeSeconds();
+	}
+
+	// We run this here, as we expect the Restore function to be called frequently
+	// and it saves the caller having to call a separate function
+	CheckForExpiredRSACells(World);
+}
+
+void USpudState::CheckForExpiredRSACells(const UWorld& World)
+{
+	const double ExpiryTime = World.GetTimeSeconds() - CVarRSASpatialCellInactiveTimeSecs.GetValueOnAnyThread();
+	for (auto It = RSACellLastAccessedTimes.CreateIterator(); It; ++It)
+	{
+		if (It.Value() <= ExpiryTime)
+		{
+			// Cell has expired, flush to disk and remove from set
+			const FString LevelName = GetLevelNameFromLevelCoords(It.Key());
+			UE_LOG(LogSpudState, Verbose, TEXT("Flushing RSA data to disk: %s"), *LevelName);
+			ReleaseLevelData(LevelName, false);
+			It.RemoveCurrent();
 		}
 	}
 }
