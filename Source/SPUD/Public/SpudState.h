@@ -376,7 +376,18 @@ public:
 	using FLoadCondition = TFunction<bool(const FBox&)>;
 	
 	void StoreRuntimeSpawnedActor(AActor& Actor);
-	void RestoreRuntimeSpawnedActors(const UWorld& World, const FLoadCondition& LoadCondition);
+	void RestoreRuntimeSpawnedActors(const UWorld& World, const TArray<FBox>& Bounds, const FLoadCondition& LoadCondition);
+private:
+	typedef TTuple<int32, int32> FSpudStateRSALevelCoord;
+	
+	TMap<FSpudStateRSALevelCoord, double> RSACellLastAccessedTimes;
+
+	void RestoreRuntimeSpawnedActorsFromLevel(const UWorld& World, const FLoadCondition& LoadCondition, const FString& LevelName);
+	FSpudStateRSALevelCoord GetLevelCoordsFromLocation(const FVector& Location) const;
+	FString GetLevelNameFromLevelCoords(const FSpudStateRSALevelCoord Coord) const;
+	void GetLevelCoordsFromBounds(const FBox& Bounds, TSet<FSpudStateRSALevelCoord>& OutCoords) const;
+	void CheckForExpiredRSACells(const UWorld& World);
+public:
 	// @third party code - END Add support for runtime spawned actors in WP
 	
 	bool bTestRequireSlowPath = false;
