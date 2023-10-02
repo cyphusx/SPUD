@@ -954,6 +954,11 @@ void USpudState::RestoreLoadedWorld(UWorld* World, bool bSingleLevel, const FStr
 		if (bSingleLevel && GetLevelName(Level) != OnlyLevel)
 			continue;
 
+		// @third party code - BEGIN Skip over partition cells during initial restore, as they're restored later
+		if (World->IsPartitionedWorld() && Level->IsWorldPartitionRuntimeCell())
+			continue;
+		// @third party code - END Skip over partition cells during initial restore, as they're restored later
+		
 		RestoreLevel(Level);
 		
 	}
