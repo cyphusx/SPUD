@@ -877,6 +877,15 @@ void USpudSubsystem::SubscribeAllLevelObjectEvents()
 	{
 		for (ULevel* Level : World->GetLevels())
 		{
+			// @third party code - BEGIN Skip over partition cells during initial restore, as they're restored later
+			// Null levels possible
+			if (!IsValid(Level))
+				continue;
+
+			if (World->IsPartitionedWorld() && Level->IsWorldPartitionRuntimeCell())
+				continue;
+			// @third party code - END Skip over partition cells during initial restore, as they're restored later
+
 			SubscribeLevelObjectEvents(Level);			
 		}
 	}
