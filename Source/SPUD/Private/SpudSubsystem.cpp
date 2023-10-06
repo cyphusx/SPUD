@@ -1622,8 +1622,8 @@ void USpudSubsystem::StoreRuntimeSpawnedActor(AActor& Actor)
 {
 	GetActiveState()->StoreRuntimeSpawnedActor(Actor);
 }
-void USpudSubsystem::RestoreRuntimeSpawnedActors(const UWorld& World, const USpudState::FLoadCondition& LoadCondition)
+void USpudSubsystem::RestoreRuntimeSpawnedActors(const UWorld& World, const TArray<FBox>& Bounds, const USpudState::FLoadCondition& LoadCondition)
 {
-	GetActiveState()->RestoreRuntimeSpawnedActors(World, LoadCondition);
+	GetActiveState()->RestoreRuntimeSpawnedActors(World, Bounds, LoadCondition);
 }
 // @third party code - END Add support for runtime spawned actors in WP
