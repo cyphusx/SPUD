@@ -227,6 +227,11 @@ protected:
 
 	UPROPERTY()
 	TMap<ULevelStreaming*, USpudStreamingLevelWrapper*> MonitoredStreamingLevels;
+	
+	// @third party code - BEGIN Prevent a store happening before a restore
+	FCriticalSection LoadingFlagsMutex;
+	TSet<FName> LoadingFlags;
+	// @third party code - END Prevent a store happening before a restore 
 
 	bool ServerCheck(bool LogWarning) const;
 

@@ -512,6 +512,14 @@ void USpudSubsystem::HandleLevelLoaded(FName LevelName)
 	// that way the loading occurs in this thread, less latency
 	GetActiveState()->PreLoadLevelData(LevelName.ToString());
 
+	// @third party code - BEGIN Prevent a store happening before a restore
+	// Remember that we're waiting on a load
+	{
+		FScopeLock LoadingFlagLock(&LoadingFlagsMutex);
+		LoadingFlags.Add(LevelName);
+	}
+	// @third party code - END Prevent a store happening before a restore
+	
 	AsyncTask(ENamedThreads::GameThread, [this, LevelName]()
 	{
 		// But also add a slight delay so we get a tick in between so physics works
@@ -520,7 +528,22 @@ void USpudSubsystem::HandleLevelLoaded(FName LevelName)
 		{
 			World->GetTimerManager().SetTimer(H, [this, LevelName]()
 			{
+				// @third party code - BEGIN Prevent a store happening before a restore
+				{
+					FScopeLock LoadingFlagLock(&LoadingFlagsMutex);
+					if (LoadingFlags.Contains(LevelName))
+					{
+						LoadingFlags.Remove(LevelName);
+					}
+					else
+					{
+						UE_LOG(LogSpudSubsystem, Verbose, TEXT("Skipping restore, as loading flag no longer present: %s"), *LevelName.ToString());
+						return;
+					}
+				}
 				PostLoadStreamLevelGameThread(LevelName);
+				
+				// @third party code - END Prevent a store happening before a restore
 			}, 0.01, false);
 		}
 	});
@@ -528,6 +551,23 @@ void USpudSubsystem::HandleLevelLoaded(FName LevelName)
 
 void USpudSubsystem::HandleLevelUnloaded(ULevel* Level)
 {
+	// @third party code - BEGIN Prevent a store happening before a restore
+	// If we're still waiting on a load, just skip both
+	{
+		FScopeLock LoadingFlagLock(&LoadingFlagsMutex);
+		if (Level)
+		{
+			const FName LevelName = FName(USpudState::GetLevelName(Level));
+			if (LoadingFlags.Contains(LevelName))
+			{
+				LoadingFlags.Remove(LevelName);
+				UE_LOG(LogSpudSubsystem, Verbose, TEXT("Skipping store, as loading flag still present: %s"), *LevelName.ToString());
+				return;
+			}
+		}
+	}
+	// @third party code - END Prevent a store happening before a restore
+	
 	if (ShouldStoreLevel(Level))
 	{
 		UnsubscribeLevelObjectEvents(Level);
